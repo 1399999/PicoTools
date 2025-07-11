@@ -13,41 +13,25 @@
 // For testing purposes.
 int main()
 {
+    stdio_init_all();
+
     while(true)
     {
-        write_line("Example 1\n");
-
-        write_line("Hello, world!");
-
-        write_line("\nExample 2\n");
+        printf("Example 1\n");
 
         set_led(true);
-        sleep(500);
+        sleep(5000);
 
         set_led(false);
-        sleep(500);
+        sleep(5000);
 
-        write_line("\nExample 3\n");
+        printf("\nExample 2\n");
+
+        printf("Raw value: 0x%03x, voltage: %f V\n", read_gpio_pin_adc_raw(0), read_gpio_pin_adc_volts(0));
     }
 }
 
 #pragma region Basic Functions
-void write(string str)
-{
-    if (!is_stdio_init)
-    {
-        stdio_init_all();
-        is_stdio_init = true;
-    }
-
-    printf(str);
-}
-
-void write_line(string str)
-{
-    write(str);
-    write("\n");
-}
 
 void sleep(uint32_t milliseconds)
 {

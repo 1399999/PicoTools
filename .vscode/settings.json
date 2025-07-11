@@ -41,6 +41,8 @@
         "stdlib.h": "c",
         "array": "c",
         "algorithm": "c",
-        "format": "c"
+        "format": "c",
+        "functional": "c",
+        "picolibrary.h": "c"
     }
 }

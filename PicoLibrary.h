@@ -1,6 +1,5 @@
 typedef char * string;
 
-bool is_stdio_init = false;
 bool is_led_init = false;
 
 #ifdef CYW43_WL_GPIO_LED_PIN
@@ -18,8 +17,6 @@ uint8_t temp_adc_gpio_index = 0;
 int main();
 
 // Basic functions
-void write(string str);
-void write_line(string str);
 void sleep(uint32_t milliseconds);
 int led_init();
 void set_led(bool led_on);
