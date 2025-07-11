@@ -43,7 +43,13 @@ float read_gpio_pin_adc_volts(uint8_t adc_input);
 bool contains_uint8_t(uint8_t array[], uint8_t value);
 
 // Examples
-int one_without_library();
-int one_with_library();
+void one_without_library();
+void one_with_library();
+void two_without_library();
+void two_with_library();
+void three_without_library();
+void three_with_library();
+void four_without_library();
+void four_with_library();
 
 #endif

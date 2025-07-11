@@ -88,6 +88,7 @@ bool contains_uint8_t(uint8_t array[], uint8_t value)
     return false;
 }
 #pragma endregion
+
 #pragma region Example 1 (Hello World)
     void one_without_library() 
     {
