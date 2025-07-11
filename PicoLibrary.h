@@ -1,3 +1,17 @@
+#include <stdio.h>
+#include "pico/stdlib.h"
+#include "hardware/gpio.h"
+#include "hardware/adc.h"
+
+// Pico W devices use a GPIO on the WIFI chip for the LED,
+// so when building for Pico W, CYW43_WL_GPIO_LED_PIN will be defined.
+#ifdef CYW43_WL_GPIO_LED_PIN
+    #include "pico/cyw43_arch.h"
+#endif
+
+#ifndef PICOLIBRARY_H_
+#define PICOLIBRARY_H_
+
 typedef char * string;
 
 bool is_led_init = false;
@@ -27,3 +41,9 @@ float read_gpio_pin_adc_volts(uint8_t adc_input);
 
 // Utility functions
 bool contains_uint8_t(uint8_t array[], uint8_t value);
+
+// Examples
+int one_without_library();
+int one_with_library();
+
+#endif

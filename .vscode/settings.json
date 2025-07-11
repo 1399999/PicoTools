@@ -43,6 +43,7 @@
         "algorithm": "c",
         "format": "c",
         "functional": "c",
-        "picolibrary.h": "c"
+        "picolibrary.h": "c",
+        "stdio.h": "c"
     }
 }
