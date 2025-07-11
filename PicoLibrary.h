@@ -51,5 +51,10 @@ void three_without_library();
 void three_with_library();
 void four_without_library();
 void four_with_library();
+void five_without_library();
+
+// Utilities for Examples
+void printhelp();
+void __not_in_flash_func(adc_capture)(uint16_t *buf, size_t count);
 
 #endif
