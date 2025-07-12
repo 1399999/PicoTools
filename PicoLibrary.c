@@ -50,18 +50,26 @@ void set_led(bool led_on)
 
 uint16_t adc_read_gpio_pin_raw(uint8_t adc_input)
 {
+    int pin = adc_input + 26;
+
     if (!is_adc_init)
     {
         adc_init();
         is_adc_init = true;
     }
 
-    if (!contains_uint8_t(temp_used_adc_gpio_pins, adc_input + 26))
+    if (!is_gpio_init)
+    {
+        gpio_init(pin);
+        is_adc_init = true;
+    }
+
+    if (!contains_uint8_t(temp_used_adc_gpio_pins, pin))
     {
         // Make sure GPIO is high-impedance, no pullups etc.
-        adc_gpio_init(adc_input + 26);
+        adc_gpio_init(pin);
 
-        temp_used_adc_gpio_pins[temp_adc_gpio_index++] = adc_input + 26;
+        temp_used_adc_gpio_pins[temp_adc_gpio_index++] = pin;
     }
 
     // Select ADC input 0 (GPIO26), input 1 (GPIO27) ....
@@ -243,7 +251,7 @@ void gpio_pin_set_high_low(uint8_t pin, bool is_high)
 }
 
 #pragma endregion
-#pragma region Utility Function
+#pragma region Utility Functions
 
 bool contains_uint8_t(uint8_t array[], uint8_t value)
 {
@@ -648,7 +656,7 @@ void five_with_library()
                 printf("\nPress any key to stop wiggling\n");
                 int i = 1;
                 gpio_pins_set_all_directions(-1);
-                
+
                 while (getchar_timeout_us(0) == PICO_ERROR_TIMEOUT) 
                 {
                     // Pattern: Flash all pins for a cycle,
@@ -758,6 +766,59 @@ void six_with_library()
         #endif
 
         sleep(990);
+    }
+}
+
+void seven_without_library() 
+{
+    #define ADC_NUM 0
+    #define ADC_PIN (26 + ADC_NUM)
+    #define ADC_VREF 3.3
+    #define ADC_RANGE (1 << 12)
+    #define ADC_CONVERT (ADC_VREF / (ADC_RANGE - 1))
+
+    stdio_init_all();
+    printf("Beep boop, listening...\n");
+
+    bi_decl(bi_program_description("Analog microphone example for Raspberry Pi Pico")); // for picotool
+    bi_decl(bi_1pin_with_name(ADC_PIN, "ADC input pin"));
+
+    adc_init();
+    adc_gpio_init( ADC_PIN);
+    adc_select_input( ADC_NUM);
+
+    uint adc_raw;
+    
+    while (true) 
+    {
+        adc_raw = adc_read(); // raw voltage from ADC
+        printf("%.2f\n", adc_raw * ADC_CONVERT);
+        sleep_ms(10);
+    }
+}
+
+void seven_with_library() 
+{
+    #define ADC_NUM 0
+    #define ADC_PIN (26 + ADC_NUM)
+    #define ADC_VREF 3.3
+    #define ADC_RANGE (1 << 12)
+    #define ADC_CONVERT (ADC_VREF / (ADC_RANGE - 1))
+
+    stdio_init_all();
+    printf("Beep boop, listening...\n");
+    
+    // Binary info canot be made into functions.
+    binary_info_add_description("Analog microphone example for Raspberry Pi Pico"); // for picotool
+    binary_info_name_pin(ADC_PIN, "ADC input pin");
+
+    uint adc_raw;
+    
+    while (true) 
+    {
+        adc_raw = adc_read_gpio_pin_raw(ADC_NUM); // raw voltage from ADC
+        printf("%.2f\n", adc_raw * ADC_CONVERT);
+        sleep(10);
     }
 }
 

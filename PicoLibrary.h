@@ -2,6 +2,8 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
+#include "hardware/uart.h"
+#include "pico/binary_info.h"
 
 // Pico W devices use a GPIO on the WIFI chip for the LED,
 // so when building for Pico W, CYW43_WL_GPIO_LED_PIN will be defined.
@@ -61,6 +63,10 @@ void gpio_pin_set_input_output(uint8_t pin, bool is_input);
 void gpio_pin_set_mode(uint8_t pin, bool is_input);
 void gpio_pin_set_high_low(uint8_t pin, bool is_high);
 
+// Binary functions
+#define binary_info_add_description(description) bi_decl(bi_program_description(description))
+#define binary_info_name_pin(pin, name) bi_decl(bi_1pin_with_name(pin, name))
+
 // Utility functions
 bool contains_uint8_t(uint8_t array[], uint8_t value);
 
@@ -77,6 +83,8 @@ void five_without_library();
 void five_with_library();
 void six_without_library();
 void six_with_library();
+void seven_without_library();
+void seven_with_library();
 
 // Utilities for Examples
 void printhelp();

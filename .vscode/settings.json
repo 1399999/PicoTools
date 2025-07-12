@@ -50,6 +50,8 @@
         "system_error": "c",
         "tuple": "c",
         "type_traits": "c",
-        "utility": "c"
+        "utility": "c",
+        "text_encoding": "c",
+        "typeinfo": "c"
     }
 }
