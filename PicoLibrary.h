@@ -28,6 +28,13 @@ uint8_t temp_used_adc_gpio_pins[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t * used_adc_gpio_pins = temp_used_adc_gpio_pins;
 uint8_t temp_adc_gpio_index = 0;
 
+enum temperature_enum
+{
+    CELCIUS,
+    FAHRENHEIT,
+    KELVIN
+};
+
 int main();
 
 // Basic functions
@@ -65,9 +72,11 @@ void four_without_library();
 void four_with_library();
 void five_without_library();
 void five_with_library();
+void six_without_library();
 
 // Utilities for Examples
 void printhelp();
 void __not_in_flash_func(adc_capture)(uint16_t *buf, size_t count);
+float read_onboard_temperature(const char unit);
 
 #endif
