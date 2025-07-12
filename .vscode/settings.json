@@ -44,6 +44,12 @@
         "format": "c",
         "functional": "c",
         "picolibrary.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "charconv": "c",
+        "optional": "c",
+        "system_error": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c"
     }
 }

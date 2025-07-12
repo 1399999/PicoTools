@@ -3,7 +3,7 @@
 // For testing purposes.
 int main()
 {
-    five_with_library();
+    six_with_library();
 }
 
 #pragma region Basic Functions
@@ -48,7 +48,7 @@ void set_led(bool led_on)
 #pragma endregion
 #pragma region ADC Functions
 
-uint16_t read_gpio_pin_adc_raw(uint8_t adc_input)
+uint16_t adc_read_gpio_pin_raw(uint8_t adc_input)
 {
     if (!is_adc_init)
     {
@@ -70,13 +70,13 @@ uint16_t read_gpio_pin_adc_raw(uint8_t adc_input)
     return adc_read();
 }
 
-float read_gpio_pin_adc_volts(uint8_t adc_input)
+float adc_read_gpio_pin_volts(uint8_t adc_input)
 {
     const float conversion_factor = 3.3f / (1 << 12);
-    return read_gpio_pin_adc_raw(adc_input) * conversion_factor;
+    return adc_read_gpio_pin_raw(adc_input) * conversion_factor;
 }
 
-void set_adc_temperature_sensor(bool on)
+void adc_set_temperature_sensor(bool on)
 {
     if (!is_adc_init)
     {
@@ -87,7 +87,7 @@ void set_adc_temperature_sensor(bool on)
     adc_set_temp_sensor_enabled(on);
 }
 
-void select_input_adc(uint8_t pin)
+void adc_select_pin(uint8_t pin)
 {
     if (!is_adc_init)
     {
@@ -117,6 +117,12 @@ float adc_read_selected_volts()
 
 void __not_in_flash_func(adc_capture)(uint16_t *buf, size_t count) 
 {
+    if (!is_adc_init)
+    {
+        adc_init();
+        is_adc_init = true;
+    }
+
     adc_fifo_setup(true, false, 0, false, false);
     adc_run(true);
 
@@ -129,56 +135,111 @@ void __not_in_flash_func(adc_capture)(uint16_t *buf, size_t count)
     adc_fifo_drain();
 }
 
-void gpio_pins_change_all(uint32_t function)
+float acd_read_onboard_temperature(enum temperature_enum temperature, uint8_t pin) 
 {
-    gpio_put_all(function);
+    if (!is_adc_init)
+    {
+        adc_init();
+        is_gpio_init = true;
+    }
+
+    /* Initialize hardware AD converter, enable onboard temperature sensor and
+     *   select its channel (do this once for efficiency, but beware that this
+     *   is a global operation). */
+
+    adc_set_temp_sensor_enabled(true);
+    adc_select_input(pin);
+
+    /* 12-bit conversion, assume max value == ADC_VREF == 3.3 V */
+    const float conversionFactor = 3.3f / (1 << 12);
+
+    float adc = (float) adc_read() * conversionFactor;
+    float tempC = 27.0f - (adc - 0.706f) / 0.001721f;
+
+    if (temperature == CELCIUS) 
+    {
+        return tempC;
+    } 
+    
+    else if (temperature == FAHRENHEIT) 
+    {
+        return tempC * 9 / 5 + 32;
+    }
+
+    else if (temperature == KELVIN) 
+    {
+        return tempC + 273.15;
+    }
+
+    return -1.0f;
 }
 
 #pragma endregion
 #pragma region GPIO Functions
 
-void set_all_gpio_pins(uint32_t value)
+void gpio_pins_change_all(uint32_t function)
 {
-    if (!is_adc_init)
-    {
-        adc_init();
-        is_adc_init = true;
-    }
+    gpio_put_all(function);
+}
 
+void gpio_pins_set_all_directions(uint32_t value)
+{
     gpio_set_dir_all_bits(value);
 }
 
-void set_function_gpio_pin(uint8_t pin, gpio_function_t function)
+void gpio_pin_set_function(uint8_t pin, gpio_function_t function)
 {
-    if (!is_adc_init)
+    if (!is_gpio_init)
     {
-        adc_init();
-        is_adc_init = true;
+        gpio_init(pin);
+        is_gpio_init = true;
     }
 
     gpio_set_function(pin, function);
 }
 
-void disable_pulls_gpio_pin(uint8_t pin)
+void gpio_pin_disable_pulls(uint8_t pin)
 {
-    if (!is_adc_init)
+    if (!is_gpio_init)
     {
-        adc_init();
-        is_adc_init = true;
+        gpio_init(pin);
+        is_gpio_init = true;
     }
 
     gpio_disable_pulls(pin);
 }
 
-void set_input_enabled_gpio_pins(uint8_t pin, bool enabled)
+void gpio_pin_set_input_output(uint8_t pin, bool is_input)
 {
-    if (!is_adc_init)
+    if (!is_gpio_init)
     {
-        adc_init();
-        is_adc_init = true;
+        gpio_init(pin);
+        is_gpio_init = true;
     }
 
-    gpio_set_input_enabled(pin, enabled);
+    gpio_set_input_enabled(pin, is_input);
+}
+
+void gpio_pin_set_mode(uint8_t pin, bool is_input)
+{
+    if (!is_gpio_init)
+    {
+        gpio_init(pin);
+        is_gpio_init = true;
+    }
+
+    gpio_set_input_enabled(pin, is_input);
+}
+
+void gpio_pin_set_high_low(uint8_t pin, bool is_high)
+{
+    if (!is_gpio_init)
+    {
+        gpio_init(pin);
+        is_gpio_init = true;
+    }
+
+    gpio_put(pin, is_high);
 }
 
 #pragma endregion
@@ -306,7 +367,7 @@ void three_with_library()
     {
         // 12-bit conversion, assume max value == ADC_VREF == 3.3 V
         const float conversion_factor = 3.3f / (1 << 12);
-        uint16_t result = read_gpio_pin_adc_raw(0);
+        uint16_t result = adc_read_gpio_pin_raw(0);
         printf("Raw value: 0x%03x, voltage: %f V\n", result, result * conversion_factor);
         sleep_ms(500);
     }
@@ -364,8 +425,8 @@ void four_with_library()
 
     while (true) 
     {
-        uint adc_x_raw = read_gpio_pin_adc_raw(0);
-        uint adc_y_raw = read_gpio_pin_adc_raw(1);
+        uint adc_x_raw = adc_read_gpio_pin_raw(0);
+        uint adc_y_raw = adc_read_gpio_pin_raw(1);
 
         // Display the joystick position something like this:
         // X: [            o             ]  Y: [              o         ]
@@ -515,18 +576,18 @@ void five_without_library()
 void five_with_library() 
 {
     stdio_init_all();
-    set_adc_temperature_sensor(true);
+    adc_set_temperature_sensor(true);
 
     // Set all pins to input (as far as SIO is concerned).
-    set_all_gpio_pins(0);
+    gpio_pins_set_all_directions(0);
 
     for (int i = 2; i < 30; ++i) 
     {
-        set_function_gpio_pin(i, GPIO_FUNC_SIO);
+        gpio_pin_set_function(i, GPIO_FUNC_SIO);
         if (i >= 26) 
         {
-            disable_pulls_gpio_pin(i);
-            set_input_enabled_gpio_pins(i, false);
+            gpio_pin_disable_pulls(i);
+            gpio_pin_set_input_output(i, false);
         }
     }
 
@@ -553,7 +614,7 @@ void five_with_library()
                 
                 else 
                 {
-                    select_input_adc(c - '0');
+                    adc_select_input(c - '0');
                     printf("Switched to channel %c\n", c);
                 }
 
@@ -586,7 +647,8 @@ void five_with_library()
             {
                 printf("\nPress any key to stop wiggling\n");
                 int i = 1;
-                set_all_gpio_pins(-1);
+                gpio_pins_set_all_directions(-1);
+                
                 while (getchar_timeout_us(0) == PICO_ERROR_TIMEOUT) 
                 {
                     // Pattern: Flash all pins for a cycle,
@@ -594,7 +656,8 @@ void five_with_library()
                     i = i ? i << 1 : 1;
                     gpio_pins_change_all(i ? i : ~0);
                 }
-                set_all_gpio_pins(0);
+
+                gpio_pins_set_all_directions(0);
                 printf("Wiggling halted.\n");
                 break;
             }
@@ -643,7 +706,7 @@ float read_onboard_temperature(const char unit)
     return -1.0f;
 }
 
-int six_without_library() 
+void six_without_library() 
 {
     stdio_init_all();
     #ifdef PICO_DEFAULT_LED_PIN
@@ -669,7 +732,32 @@ int six_without_library()
 
             gpio_put(PICO_DEFAULT_LED_PIN, 0);
         #endif
+
         sleep_ms(990);
+    }
+}
+
+void six_with_library() 
+{
+    stdio_init_all();
+
+    #ifdef PICO_DEFAULT_LED_PIN
+        gpio_pin_set_mode(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+    #endif
+
+    while (true) 
+    {
+        float temperature = acd_read_onboard_temperature(CELCIUS, 4);
+        printf("Onboard temperature = %.02f %c\n", temperature, TEMPERATURE_UNITS);
+
+        #ifdef PICO_DEFAULT_LED_PIN
+            gpio_pin_set_high_low(PICO_DEFAULT_LED_PIN, 1);
+            sleep(10);
+
+            gpio_pin_set_high_low(PICO_DEFAULT_LED_PIN, 0);
+        #endif
+
+        sleep(990);
     }
 }
 
