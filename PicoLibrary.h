@@ -4,6 +4,8 @@
 #include "hardware/adc.h"
 #include "hardware/uart.h"
 #include "pico/binary_info.h"
+#include "pico/multicore.h"
+#include "pico/float.h"
 
 // Pico W devices use a GPIO on the WIFI chip for the LED,
 // so when building for Pico W, CYW43_WL_GPIO_LED_PIN will be defined.
@@ -25,6 +27,7 @@ typedef char * string;
 bool is_led_init = false;
 bool is_adc_init = false;
 bool is_gpio_init = false;
+bool is_pico_w_init = false;
 
 uint8_t temp_used_adc_gpio_pins[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t * used_adc_gpio_pins = temp_used_adc_gpio_pins;
@@ -67,6 +70,11 @@ void gpio_pin_set_high_low(uint8_t pin, bool is_high);
 #define binary_info_add_description(description) bi_decl(bi_program_description(description))
 #define binary_info_name_pin(pin, name) bi_decl(bi_1pin_with_name(pin, name))
 
+// Miscellaneous Functions
+int power_get_status(bool * battery_powered);
+int power_get_voltage_status(float * voltage_result, uint8_t pin, int power_sample_count);
+void pico_w_deinit();
+
 // Utility functions
 bool contains_uint8_t(uint8_t array[], uint8_t value);
 
@@ -85,10 +93,14 @@ void six_without_library();
 void six_with_library();
 void seven_without_library();
 void seven_with_library();
+void eight_without_library();
+void eight_with_library();
 
 // Utilities for Examples
 void printhelp();
 void __not_in_flash_func(adc_capture)(uint16_t *buf, size_t count);
 float read_onboard_temperature(const char unit);
+int power_source(bool *battery_powered);
+int power_voltage(float *voltage_result);
 
 #endif

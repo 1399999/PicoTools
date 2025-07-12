@@ -250,6 +250,98 @@ void gpio_pin_set_high_low(uint8_t pin, bool is_high)
     gpio_put(pin, is_high);
 }
 
+#pragma region Miscellaneous Functions
+
+int power_get_status(bool * is_battery_powered) 
+{
+    // Pico W uses a CYW43 pin to get VBUS so we need to initialize it.
+    #if CYW43_USES_VSYS_PIN
+        if (!is_pico_w_init)
+        {
+            cyw43_arch_init();
+            is_pico_w_init = true;
+        }
+    #endif
+
+    #if defined CYW43_WL_GPIO_VBUS_PIN
+        *is_battery_powered = !cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN);
+        return PICO_OK;
+    #elif defined PICO_VBUS_PIN
+        gpio_set_function(PICO_VBUS_PIN, GPIO_FUNC_SIO);
+        *is_battery_powered = !gpio_get(PICO_VBUS_PIN);
+        return PICO_OK;
+    #else
+        return PICO_ERROR_NO_DATA;
+    #endif
+}
+
+int power_get_voltage_status(float * voltage_result, uint8_t pin, int power_sample_count) 
+{
+    // Pico W uses a CYW43 pin to get VBUS so we need to initialize it.
+    #if CYW43_USES_VSYS_PIN
+        if (!is_pico_w_init)
+        {
+            cyw43_arch_init();
+            is_pico_w_init = true;
+        }
+    #endif
+
+    #ifndef PICO_VSYS_PIN
+        return PICO_ERROR_NO_DATA;
+    #else
+    #if CYW43_USES_VSYS_PIN
+        cyw43_thread_enter();
+        // Make sure cyw43 is awake
+        cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN);
+    #endif
+
+    // setup adc
+    adc_gpio_init(PICO_VSYS_PIN);
+    adc_select_input(PICO_VSYS_PIN - pin);
+ 
+    adc_fifo_setup(true, false, 0, false, false);
+    adc_run(true);
+
+    // We seem to read low values initially - this seems to fix it
+    int ignore_count = power_sample_count;
+
+    while (!adc_fifo_is_empty() || ignore_count-- > 0) 
+    {
+        (void)adc_fifo_get_blocking();
+    }
+
+    // read vsys
+    uint32_t vsys = 0;
+
+    for(int i = 0; i < power_sample_count; i++) 
+    {
+        uint16_t val = adc_fifo_get_blocking();
+        vsys += val;
+    }
+
+    adc_run(false);
+    adc_fifo_drain();
+
+    vsys /= power_sample_count;
+    #if CYW43_USES_VSYS_PIN
+        cyw43_thread_exit();
+    #endif
+        // Generate voltage
+        const float conversion_factor = 3.3f / (1 << 12);
+        *voltage_result = vsys * 3 * conversion_factor;
+        return PICO_OK;
+    #endif
+}
+
+void pico_w_deinit()
+{
+    #if CYW43_USES_VSYS_PIN
+        cyw43_arch_deinit();
+    #endif
+}
+
+#pragma endregion
+
 #pragma endregion
 #pragma region Utility Functions
 
@@ -769,6 +861,9 @@ void six_with_library()
     }
 }
 
+#pragma endregion
+#pragma region Example 7 (ADC Microphone)
+
 void seven_without_library() 
 {
     #define ADC_NUM 0
@@ -820,6 +915,197 @@ void seven_with_library()
         printf("%.2f\n", adc_raw * ADC_CONVERT);
         sleep(10);
     }
+}
+
+#pragma endregion
+#pragma region Example 8 (Read VSYS)
+
+#ifndef PICO_POWER_SAMPLE_COUNT
+    #define PICO_POWER_SAMPLE_COUNT 3
+#endif
+
+// Pin used for ADC 0
+#define PICO_FIRST_ADC_PIN 26
+
+int power_source(bool *battery_powered) 
+{
+    #if defined CYW43_WL_GPIO_VBUS_PIN
+        *battery_powered = !cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN);
+        return PICO_OK;
+    #elif defined PICO_VBUS_PIN
+        gpio_set_function(PICO_VBUS_PIN, GPIO_FUNC_SIO);
+        *battery_powered = !gpio_get(PICO_VBUS_PIN);
+        return PICO_OK;
+    #else
+        return PICO_ERROR_NO_DATA;
+    #endif
+}
+
+int power_voltage(float *voltage_result) 
+{
+    #ifndef PICO_VSYS_PIN
+        return PICO_ERROR_NO_DATA;
+    #else
+    #if CYW43_USES_VSYS_PIN
+        cyw43_thread_enter();
+        // Make sure cyw43 is awake
+        cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN);
+    #endif
+
+    // setup adc
+    adc_gpio_init(PICO_VSYS_PIN);
+    adc_select_input(PICO_VSYS_PIN - PICO_FIRST_ADC_PIN);
+ 
+    adc_fifo_setup(true, false, 0, false, false);
+    adc_run(true);
+
+    // We seem to read low values initially - this seems to fix it
+    int ignore_count = PICO_POWER_SAMPLE_COUNT;
+
+    while (!adc_fifo_is_empty() || ignore_count-- > 0) 
+    {
+        (void)adc_fifo_get_blocking();
+    }
+
+    // read vsys
+    uint32_t vsys = 0;
+
+    for(int i = 0; i < PICO_POWER_SAMPLE_COUNT; i++) 
+    {
+        uint16_t val = adc_fifo_get_blocking();
+        vsys += val;
+    }
+
+    adc_run(false);
+    adc_fifo_drain();
+
+    vsys /= PICO_POWER_SAMPLE_COUNT;
+    #if CYW43_USES_VSYS_PIN
+        cyw43_thread_exit();
+    #endif
+        // Generate voltage
+        const float conversion_factor = 3.3f / (1 << 12);
+        *voltage_result = vsys * 3 * conversion_factor;
+        return PICO_OK;
+    #endif
+}
+
+void eight_without_library() 
+{
+    stdio_init_all();
+
+    adc_init();
+    adc_set_temp_sensor_enabled(true);
+
+    // Pico W uses a CYW43 pin to get VBUS so we need to initialise it
+    #if CYW43_USES_VSYS_PIN
+    if (cyw43_arch_init()) 
+    {
+        printf("failed to initialise\n");
+        return 1;
+    }
+    #endif
+
+    bool old_battery_status = false;
+    bool battery_status = true;
+    float old_voltage = -1;
+    char *power_str = "UNKNOWN";
+
+    while(true) 
+    {
+        // Get battery status
+        if (power_source(&battery_status) == PICO_OK) 
+        {
+            power_str = battery_status ? "BATTERY" : "POWERED";
+        }
+
+        // Get voltage
+        float voltage = 0;
+        int voltage_return = power_voltage(&voltage);
+        voltage = floorf(voltage * 100) / 100;
+
+        // Display power if it's changed
+        if (old_battery_status != battery_status || old_voltage != voltage) 
+        {
+            char percent_buf[10] = {0};
+
+            if (battery_status && voltage_return == PICO_OK) 
+            {
+                const float min_battery_volts = 3.0f;
+                const float max_battery_volts = 4.2f;
+                int percent_val = (int) (((voltage - min_battery_volts) / (max_battery_volts - min_battery_volts)) * 100);
+                snprintf(percent_buf, sizeof(percent_buf), " (%d%%)", percent_val);
+            }
+
+            // Also get the temperature
+            adc_select_input(4);
+            const float conversionFactor = 3.3f / (1 << 12);
+            float adc = (float)adc_read() * conversionFactor;
+            float tempC = 27.0f - (adc - 0.706f) / 0.001721f;
+
+            // Display power and remember old vales
+            printf("Power %s, %.2fV%s, temp %.1f DegC\n", power_str, voltage, percent_buf, tempC);
+            old_battery_status = battery_status;
+            old_voltage = voltage;
+        }
+
+        sleep_ms(1000);
+    }
+
+    #if CYW43_USES_VSYS_PIN
+        cyw43_arch_deinit();
+    #endif  
+}
+
+void eight_with_library() 
+{
+    stdio_init_all();
+
+    bool old_battery_status = false;
+    bool battery_status = true;
+    float old_voltage = -1;
+    string power_str = "UNKNOWN";
+
+    while(true) 
+    {
+        // Get battery status
+        if (power_get_status(&battery_status) == PICO_OK) 
+        {
+            power_str = battery_status ? "BATTERY" : "POWERED";
+        }
+
+        // Get voltage
+        float voltage = 0;
+        int voltage_return = power_get_voltage_status(&voltage, PICO_FIRST_ADC_PIN, PICO_POWER_SAMPLE_COUNT);
+        voltage = floorf(voltage * 100) / 100;
+
+        // Display power if it's changed
+        if (old_battery_status != battery_status || old_voltage != voltage) 
+        {
+            char percent_buf[10] = {0};
+
+            if (battery_status && voltage_return == PICO_OK) 
+            {
+                const float min_battery_volts = 3.0f;
+                const float max_battery_volts = 4.2f;
+                int percent_val = (int) (((voltage - min_battery_volts) / (max_battery_volts - min_battery_volts)) * 100);
+                snprintf(percent_buf, sizeof(percent_buf), " (%d%%)", percent_val);
+            }
+
+            // Also get the temperature
+            float adc = adc_read_gpio_pin_volts(4);
+            float tempC = 27.0f - (adc - 0.706f) / 0.001721f;
+
+            // Display power and remember old vales
+            printf("Power %s, %.2fV%s, temp %.1f DegC\n", power_str, voltage, percent_buf, tempC);
+            old_battery_status = battery_status;
+            old_voltage = voltage;
+        }
+
+        sleep(1000);
+    }
+
+    pico_w_deinit();
 }
 
 #pragma endregion
