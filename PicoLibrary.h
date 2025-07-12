@@ -38,6 +38,18 @@ void set_led(bool led_on);
 // ADC functions
 uint16_t read_gpio_pin_adc_raw(uint8_t adc_input);
 float read_gpio_pin_adc_volts(uint8_t adc_input);
+void set_adc_temperature_sensor(bool on);
+void select_input_adc(uint8_t pin);
+uint16_t adc_read_selected_raw();
+float adc_read_selected_volts();
+void __not_in_flash_func(adc_capture)(uint16_t *buf, size_t count);
+void gpio_pins_change_all(uint32_t function);
+
+// GPIO functions
+void set_all_gpio_pins(uint32_t value);
+void set_function_gpio_pin(uint8_t pin, gpio_function_t function);
+void disable_pulls_gpio_pin(uint8_t pin);
+void set_input_enabled_gpio_pins(uint8_t pin, bool enabled);
 
 // Utility functions
 bool contains_uint8_t(uint8_t array[], uint8_t value);
@@ -52,6 +64,7 @@ void three_with_library();
 void four_without_library();
 void four_with_library();
 void five_without_library();
+void five_with_library();
 
 // Utilities for Examples
 void printhelp();

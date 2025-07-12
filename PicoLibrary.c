@@ -3,7 +3,7 @@
 // For testing purposes.
 int main()
 {
-    four_with_library();
+    five_with_library();
 }
 
 #pragma region Basic Functions
@@ -47,6 +47,7 @@ void set_led(bool led_on)
 
 #pragma endregion
 #pragma region ADC Functions
+
 uint16_t read_gpio_pin_adc_raw(uint8_t adc_input)
 {
     if (!is_adc_init)
@@ -75,6 +76,114 @@ float read_gpio_pin_adc_volts(uint8_t adc_input)
     return read_gpio_pin_adc_raw(adc_input) * conversion_factor;
 }
 
+void set_adc_temperature_sensor(bool on)
+{
+    if (!is_adc_init)
+    {
+        adc_init();
+        is_adc_init = true;
+    }
+
+    adc_set_temp_sensor_enabled(on);
+}
+
+void select_input_adc(uint8_t pin)
+{
+    if (!is_adc_init)
+    {
+        adc_init();
+        is_adc_init = true;
+    }
+
+    adc_select_input(pin);
+}
+
+uint16_t adc_read_selected_raw()
+{
+    if (!is_adc_init)
+    {
+        adc_init();
+        is_adc_init = true;
+    }
+
+    return adc_read();
+}
+
+float adc_read_selected_volts()
+{
+    const float conversion_factor = 3.3f / (1 << 12);
+    return adc_read_selected_raw() * conversion_factor;
+}
+
+void __not_in_flash_func(adc_capture)(uint16_t *buf, size_t count) 
+{
+    adc_fifo_setup(true, false, 0, false, false);
+    adc_run(true);
+
+    for (size_t i = 0; i < count; i = i + 1)
+    {
+        buf[i] = adc_fifo_get_blocking();
+    }
+
+    adc_run(false);
+    adc_fifo_drain();
+}
+
+void gpio_pins_change_all(uint32_t function)
+{
+    gpio_put_all(function);
+}
+
+#pragma endregion
+#pragma region GPIO Functions
+
+void set_all_gpio_pins(uint32_t value)
+{
+    if (!is_adc_init)
+    {
+        adc_init();
+        is_adc_init = true;
+    }
+
+    gpio_set_dir_all_bits(value);
+}
+
+void set_function_gpio_pin(uint8_t pin, gpio_function_t function)
+{
+    if (!is_adc_init)
+    {
+        adc_init();
+        is_adc_init = true;
+    }
+
+    gpio_set_function(pin, function);
+}
+
+void disable_pulls_gpio_pin(uint8_t pin)
+{
+    if (!is_adc_init)
+    {
+        adc_init();
+        is_adc_init = true;
+    }
+
+    gpio_disable_pulls(pin);
+}
+
+void set_input_enabled_gpio_pins(uint8_t pin, bool enabled)
+{
+    if (!is_adc_init)
+    {
+        adc_init();
+        is_adc_init = true;
+    }
+
+    gpio_set_input_enabled(pin, enabled);
+}
+
+#pragma endregion
+#pragma region Utility Function
+
 bool contains_uint8_t(uint8_t array[], uint8_t value)
 {
     for (uint8_t i = 0; i < temp_adc_gpio_index; i++)
@@ -87,6 +196,7 @@ bool contains_uint8_t(uint8_t array[], uint8_t value)
 
     return false;
 }
+
 #pragma endregion
 
 #pragma region Example 1 (Hello World)
@@ -300,16 +410,6 @@ void printhelp()
     puts("w\t: Wiggle pins");
 }
 
-void __not_in_flash_func(adc_capture)(uint16_t *buf, size_t count) 
-{
-    adc_fifo_setup(true, false, 0, false, false);
-    adc_run(true);
-    for (size_t i = 0; i < count; i = i + 1)
-        buf[i] = adc_fifo_get_blocking();
-    adc_run(false);
-    adc_fifo_drain();
-}
-
 void five_without_library() 
 {
     stdio_init_all();
@@ -318,6 +418,7 @@ void five_without_library()
 
     // Set all pins to input (as far as SIO is concerned)
     gpio_set_dir_all_bits(0);
+
     for (int i = 2; i < 30; ++i) 
     {
         gpio_set_function(i, GPIO_FUNC_SIO);
@@ -340,6 +441,7 @@ void five_without_library()
         switch (c) 
         {
             case 'c':
+            {
                 c = getchar();
                 printf("%c\n", c);
                 if (c < '0' || c > '7') 
@@ -355,6 +457,8 @@ void five_without_library()
                 }
 
                 break;
+            }
+
             case 's': 
             {
                 uint32_t result = adc_read();
@@ -380,13 +484,117 @@ void five_without_library()
                 printf("\nPress any key to stop wiggling\n");
                 int i = 1;
                 gpio_set_dir_all_bits(-1);
-                while (getchar_timeout_us(0) == PICO_ERROR_TIMEOUT) {
+                while (getchar_timeout_us(0) == PICO_ERROR_TIMEOUT) 
+                {
                     // Pattern: Flash all pins for a cycle,
                     // Then scan along pins for one cycle each
                     i = i ? i << 1 : 1;
                     gpio_put_all(i ? i : ~0);
                 }
+
                 gpio_set_dir_all_bits(0);
+                printf("Wiggling halted.\n");
+
+                break;
+            }
+
+            case '\n':
+            case '\r':
+                break;
+            case 'h':
+                printhelp();
+                break;
+            default:
+                printf("\nUnrecognised command: %c\n", c);
+                printhelp();
+                break;
+        }
+    }
+}
+
+void five_with_library() 
+{
+    stdio_init_all();
+    set_adc_temperature_sensor(true);
+
+    // Set all pins to input (as far as SIO is concerned).
+    set_all_gpio_pins(0);
+
+    for (int i = 2; i < 30; ++i) 
+    {
+        set_function_gpio_pin(i, GPIO_FUNC_SIO);
+        if (i >= 26) 
+        {
+            disable_pulls_gpio_pin(i);
+            set_input_enabled_gpio_pins(i, false);
+        }
+    }
+
+    printf("\n===========================\n");
+    printf("RP2040 ADC and Test Console\n");
+    printf("===========================\n");
+    printhelp();
+
+    while (true) 
+    {
+        char c = getchar();
+        printf("%c", c);
+        switch (c) 
+        {
+            case 'c':
+            {
+                c = getchar();
+                printf("%c\n", c);
+                if (c < '0' || c > '7') 
+                {
+                    printf("Unknown input channel\n");
+                    printhelp();
+                } 
+                
+                else 
+                {
+                    select_input_adc(c - '0');
+                    printf("Switched to channel %c\n", c);
+                }
+
+                break;
+            }
+
+            case 's': 
+            {
+                uint32_t result = adc_read_selected_raw();
+                const float conversion_factor = 3.3f / (1 << 12);
+                printf("\n0x%03x -> %f V\n", result, result * conversion_factor);
+                break;
+            }
+            
+            case 'S': 
+            {
+                printf("\nStarting capture\n");
+                adc_capture(sample_buf, N_SAMPLES);
+                printf("Done\n");
+
+                for (int i = 0; i < N_SAMPLES; i = i + 1)
+                {
+                    printf("%03x\n", sample_buf[i]);
+                }
+
+                break;
+            }
+
+            case 'w': 
+            {
+                printf("\nPress any key to stop wiggling\n");
+                int i = 1;
+                set_all_gpio_pins(-1);
+                while (getchar_timeout_us(0) == PICO_ERROR_TIMEOUT) 
+                {
+                    // Pattern: Flash all pins for a cycle,
+                    // Then scan along pins for one cycle each
+                    i = i ? i << 1 : 1;
+                    gpio_pins_change_all(i ? i : ~0);
+                }
+                set_all_gpio_pins(0);
                 printf("Wiggling halted.\n");
                 break;
             }
