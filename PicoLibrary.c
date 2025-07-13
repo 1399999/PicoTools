@@ -13,27 +13,22 @@ void sleep(uint32_t milliseconds)
     sleep_ms(milliseconds);
 }
 
-int led_init()
+void led_set(bool led_on)
 {
-    #if defined(PICO_DEFAULT_LED_PIN)
+    if (!is_led_init)
+    {
+        #if defined(PICO_DEFAULT_LED_PIN)
         // A device like Pico that uses a GPIO for the LED will define PICO_DEFAULT_LED_PIN
         // so we can use normal GPIO functionality to turn the led on and off.
         gpio_init(PICO_DEFAULT_LED_PIN);
         gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
         return PICO_OK;
-    #elif defined(CYW43_WL_GPIO_LED_PIN)
-        // For Pico W devices we need to initialise the driver, etc.
-        return cyw43_arch_init();
-    #endif
+        #elif defined(CYW43_WL_GPIO_LED_PIN)
+            // For Pico W devices we need to initialise the driver, etc.
+            return cyw43_arch_init();
+        #endif
 
-    is_led_init = true;
-}
-
-void set_led(bool led_on)
-{
-    if (!is_led_init)
-    {
-        led_init();
+        is_led_init = true;
     }
 
     #if defined(PICO_DEFAULT_LED_PIN)
@@ -427,9 +422,9 @@ bool contains_uint8_t(uint8_t array[], uint8_t value)
     {
         while (true)
         {
-            set_led(true);
+            led_set(true);
             sleep(LED_DELAY_MS);
-            set_led(false);
+            led_set(false);
             sleep(LED_DELAY_MS);
         }
     }
@@ -1106,6 +1101,134 @@ void eight_with_library()
     }
 
     pico_w_deinit();
+}
+
+#pragma endregion
+#pragma region Example 9 (Blink Any)
+
+// Set an LED_TYPE variable - 0 is default, 1 is connected to WIFI chip
+// Note that LED_TYPE == 1 is only supported when initially compiled for
+// a board with PICO_CYW43_SUPPORTED (eg pico_w), else the required
+// libraries won't be present
+bi_decl(bi_program_feature_group(0x1111, 0, "LED Configuration"));
+#if defined(PICO_DEFAULT_LED_PIN)
+    // the tag and id are not important as picotool filters based on the
+    // variable name, so just set them to 0
+    bi_decl(bi_ptr_int32(0x1111, 0, LED_TYPE, 0));
+    bi_decl(bi_ptr_int32(0x1111, 0, LED_PIN, PICO_DEFAULT_LED_PIN));
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+    bi_decl(bi_ptr_int32(0x1111, 0, LED_TYPE, 1));
+    bi_decl(bi_ptr_int32(0x1111, 0, LED_PIN, CYW43_WL_GPIO_LED_PIN));
+#else
+    bi_decl(bi_ptr_int32(0x1111, 0, LED_TYPE, 0));
+    bi_decl(bi_ptr_int32(0x1111, 0, LED_PIN, 25));
+#endif
+
+#ifndef LED_DELAY_MS
+#define LED_DELAY_MS 250
+#endif
+
+// Perform initialisation
+int pico_led_init(void) 
+{
+    if (LED_TYPE == 0) 
+    {
+        // A device like Pico that uses a GPIO for the LED so we can
+        // use normal GPIO functionality to turn the led on and off
+        gpio_init(LED_PIN);
+        gpio_set_dir(LED_PIN, GPIO_OUT);
+        return PICO_OK;
+
+        #ifdef CYW43_WL_GPIO_LED_PIN
+            } 
+            
+            else if (LED_TYPE == 1) 
+            {
+                // For Pico W devices we need to initialise the driver etc
+                return cyw43_arch_init();
+        #endif
+    } 
+    
+    else 
+    {
+        return PICO_ERROR_INVALID_DATA;
+    }
+}
+
+void nine_without_library() 
+{
+    int rc = 0;
+
+    if (LED_TYPE == 0) 
+    {
+        // A device like Pico that uses a GPIO for the LED so we can
+        // use normal GPIO functionality to turn the led on and off
+        gpio_init(LED_PIN);
+        gpio_set_dir(LED_PIN, GPIO_OUT);
+        rc = PICO_OK;
+
+        #ifdef CYW43_WL_GPIO_LED_PIN
+            } 
+            
+            else if (LED_TYPE == 1) 
+            {
+                // For Pico W devices we need to initialise the driver etc
+                rc = cyw43_arch_init();
+        #endif
+    } 
+    
+    else 
+    {
+        rc = PICO_ERROR_INVALID_DATA;
+    }
+
+    hard_assert(rc == PICO_OK);
+
+    while (true) 
+    {
+        if (LED_TYPE == 0) 
+        {
+            // Just set the GPIO on or off
+            gpio_put(LED_PIN, true);
+            #ifdef CYW43_WL_GPIO_LED_PIN
+                } 
+                
+                else if (LED_TYPE == 1) 
+                {
+                    // Ask the wifi "driver" to set the GPIO on or off
+                    cyw43_arch_gpio_put(LED_PIN, led_on);
+            #endif
+        }
+
+        sleep_ms(LED_DELAY_MS);
+
+        if (LED_TYPE == 0) 
+        {
+            // Just set the GPIO on or off
+            gpio_put(LED_PIN, false);
+            #ifdef CYW43_WL_GPIO_LED_PIN
+                } 
+                
+                else if (LED_TYPE == 1) 
+                {
+                    // Ask the wifi "driver" to set the GPIO on or off
+                    cyw43_arch_gpio_put(LED_PIN, led_on);
+            #endif
+        }
+
+        sleep_ms(LED_DELAY_MS);
+    }
+}
+
+void nine_with_library()
+{
+    while (true) 
+    {
+        led_set(true);
+        sleep(LED_DELAY_MS);
+        led_set(false);
+        sleep(LED_DELAY_MS);
+    }
 }
 
 #pragma endregion

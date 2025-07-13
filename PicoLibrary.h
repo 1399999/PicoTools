@@ -44,8 +44,7 @@ int main();
 
 // Basic functions
 void sleep(uint32_t milliseconds);
-int led_init();
-void set_led(bool led_on);
+void led_set(bool led_on);
 
 // ADC functions
 uint16_t adc_read_gpio_pin_raw(uint8_t adc_input);
@@ -69,6 +68,8 @@ void gpio_pin_set_high_low(uint8_t pin, bool is_high);
 // Binary functions
 #define binary_info_add_description(description) bi_decl(bi_program_description(description))
 #define binary_info_name_pin(pin, name) bi_decl(bi_1pin_with_name(pin, name))
+#define binary_info_name_program(hex_tag, id, name) bi_decl(bi_program_feature_group(hex_tag, id, name))
+#define binary_define_variable_int32(hex_tag, id, variable_name, value) bi_decl(bi_ptr_int32(hex_tag, id, variable_name, value))
 
 // Miscellaneous Functions
 int power_get_status(bool * battery_powered);
@@ -95,6 +96,8 @@ void seven_without_library();
 void seven_with_library();
 void eight_without_library();
 void eight_with_library();
+void nine_without_library();
+void nine_with_library();
 
 // Utilities for Examples
 void printhelp();
@@ -102,5 +105,7 @@ void __not_in_flash_func(adc_capture)(uint16_t *buf, size_t count);
 float read_onboard_temperature(const char unit);
 int power_source(bool *battery_powered);
 int power_voltage(float *voltage_result);
+int pico_led_init(void);
+void pico_set_led(bool led_on);
 
 #endif

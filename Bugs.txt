@@ -1,0 +1,1 @@
+"is_GPIO_init" does not account for multiple pins.
