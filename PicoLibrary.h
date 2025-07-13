@@ -86,7 +86,8 @@ uint64_t cpu_clock_get_hz_usb();
 uint64_t cpu_clock_get_hz_adc();
 uint64_t cpu_clock_get_hz_rtc();
 uint64_t * cpu_clock_get_all();
-void cpu_clock_overclock(int hertz);
+void cpu_clock_set(int hertz);
+void gpio_pin_underclock(uint8_t pin, float underclock_by, uint source);
 
 // Miscellaneous Functions
 int power_get_status(bool * battery_powered);

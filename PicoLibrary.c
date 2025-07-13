@@ -311,7 +311,7 @@ uint64_t * cpu_clock_get_all()
     return output;
 }
 
-void cpu_clock_overclock(int hertz)
+void cpu_clock_set(int hertz)
 {
     // Change clk_sys to be 48MHz. The simplest way is to take this from PLL_USB
     // which has a source frequency of 48MHz
@@ -333,6 +333,11 @@ void cpu_clock_overclock(int hertz)
 
     // Re init uart now that clk_peri has changed
     stdio_init_all();
+}
+
+void gpio_pin_underclock(uint8_t pin, float underclock_by, uint source)
+{
+    clock_gpio_init(pin, source, underclock_by);
 }
 
 #pragma endregion
@@ -1518,6 +1523,43 @@ void eleven_with_library()
     #endif
 
     printf("Hello, 48MHz");
+}
+
+#pragma endregion
+#pragma region Example 12 (Hello 48 MHz)
+
+void twelve_without_library()
+{
+    stdio_init_all();
+    printf("Hello gpout\n");
+
+    // Output clk_sys / 10 to gpio 21, etc...
+    clock_gpio_init(21, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLK_SYS, 10);
+    clock_gpio_init(23, CLOCKS_CLK_GPOUT1_CTRL_AUXSRC_VALUE_CLK_USB, 10);
+    clock_gpio_init(24, CLOCKS_CLK_GPOUT2_CTRL_AUXSRC_VALUE_CLK_ADC, 10);
+    
+    #if PICO_RP2040
+        clock_gpio_init(25, CLOCKS_CLK_GPOUT3_CTRL_AUXSRC_VALUE_CLK_RTC, 10);
+    #else
+        clock_gpio_init(25, CLOCKS_CLK_GPOUT3_CTRL_AUXSRC_VALUE_CLK_PERI, 10);
+    #endif
+}
+
+void twelve_with_library()
+{
+    stdio_init_all();
+    printf("Hello gpout\n");
+
+    // Output clk_sys / 10 to gpio 21, etc...
+    gpio_pin_underclock(21, 10, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLK_SYS);
+    gpio_pin_underclock(23, 10, CLOCKS_CLK_GPOUT1_CTRL_AUXSRC_VALUE_CLK_USB);
+    gpio_pin_underclock(24, 10, CLOCKS_CLK_GPOUT2_CTRL_AUXSRC_VALUE_CLK_ADC);
+    
+    #if PICO_RP2040
+        gpio_pin_underclock(25, 10, CLOCKS_CLK_GPOUT3_CTRL_AUXSRC_VALUE_CLK_RTC);
+    #else
+        gpio_pin_underclock(25, 10, CLOCKS_CLK_GPOUT3_CTRL_AUXSRC_VALUE_CLK_PERI);
+    #endif
 }
 
 #pragma endregion
