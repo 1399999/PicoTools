@@ -1,11 +1,15 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
-#include "hardware/gpio.h"
-#include "hardware/adc.h"
-#include "hardware/uart.h"
 #include "pico/binary_info.h"
 #include "pico/multicore.h"
 #include "pico/float.h"
+#include "hardware/gpio.h"
+#include "hardware/adc.h"
+#include "hardware/uart.h"
+#include "hardware/pll.h"
+#include "hardware/clocks.h"
+#include "hardware/structs/pll.h"
+#include "hardware/structs/clocks.h"
 
 // Pico W devices use a GPIO on the WIFI chip for the LED,
 // so when building for Pico W, CYW43_WL_GPIO_LED_PIN will be defined.
@@ -72,6 +76,18 @@ void gpio_pin_set_high_low(uint8_t pin, bool is_high);
 #define binary_define_variable_int32(hex_tag, id, variable_name, value) bi_decl(bi_ptr_int32(hex_tag, id, variable_name, value))
 #define binary_define_variable_string(hex_tag, id, variable_name, value, max_length) bi_decl(bi_ptr_string(hex_tag, id, variable_name, value, max_length))
 
+// CPU Clock
+uint64_t cpu_clock_get_hz_pll_sys();
+uint64_t cpu_clock_get_hz_pll_usb();
+uint64_t cpu_clock_get_hz_rosc();
+uint64_t cpu_clock_get_hz_system();
+uint64_t cpu_clock_get_hz_peri();
+uint64_t cpu_clock_get_hz_usb();
+uint64_t cpu_clock_get_hz_adc();
+uint64_t cpu_clock_get_hz_rtc();
+uint64_t * cpu_clock_get_all();
+void cpu_clock_overclock(int hertz);
+
 // Miscellaneous Functions
 int power_get_status(bool * battery_powered);
 int power_get_voltage_status(float * voltage_result, uint8_t pin, int power_sample_count);
@@ -99,6 +115,11 @@ void eight_without_library();
 void eight_with_library();
 void nine_without_library();
 void nine_with_library();
+
+void ten_without_library();
+void ten_with_library();
+void eleven_without_library();
+void eleven_with_library();
 
 // Utilities for Examples
 void printhelp();

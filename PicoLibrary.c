@@ -245,6 +245,97 @@ void gpio_pin_set_high_low(uint8_t pin, bool is_high)
     gpio_put(pin, is_high);
 }
 
+#pragma endregion
+#pragma region CPU Clock
+
+uint64_t cpu_clock_get_hz_pll_sys()
+{
+    return frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_SYS_CLKSRC_PRIMARY) * 1000;
+}
+
+uint64_t cpu_clock_get_hz_pll_usb()
+{
+    return frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_USB_CLKSRC_PRIMARY) * 1000;
+}
+
+uint64_t cpu_clock_get_hz_rosc()
+{
+    return frequency_count_khz(CLOCKS_FC0_SRC_VALUE_ROSC_CLKSRC) * 1000;
+}
+
+uint64_t cpu_clock_get_hz_system()
+{
+    return frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS) * 1000;
+}
+
+uint64_t cpu_clock_get_hz_peri()
+{
+    return frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI) * 1000;
+}
+
+uint64_t cpu_clock_get_hz_usb()
+{
+    return frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_USB) * 1000;
+}
+
+uint64_t cpu_clock_get_hz_adc()
+{
+    return frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_ADC) * 1000;
+}
+
+uint64_t cpu_clock_get_hz_rtc()
+{
+    #ifdef CLOCKS_FC0_SRC_VALUE_CLK_RTC
+        return frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_ADC) * 1000;
+    #endif
+}
+
+uint64_t * cpu_clock_get_all()
+{
+    uint64_t tempOutput[8] = 
+    {
+        frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_SYS_CLKSRC_PRIMARY) * 1000,
+        frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_USB_CLKSRC_PRIMARY) * 1000,
+        frequency_count_khz(CLOCKS_FC0_SRC_VALUE_ROSC_CLKSRC) * 1000,
+        frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS) * 1000,
+        frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI) * 1000,
+        frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_USB) * 1000,
+        frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_ADC) * 1000,
+        #ifdef CLOCKS_FC0_SRC_VALUE_CLK_RTC
+            frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_RTC) * 1000
+        #endif
+    };
+
+    uint64_t * output = tempOutput;
+
+    return output;
+}
+
+void cpu_clock_overclock(int hertz)
+{
+    // Change clk_sys to be 48MHz. The simplest way is to take this from PLL_USB
+    // which has a source frequency of 48MHz
+    clock_configure(clk_sys,
+                    CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+                    CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_USB,
+                    hertz,
+                    hertz);
+
+    // Turn off PLL sys for good measure
+    pll_deinit(pll_sys);
+
+    // CLK peri is clocked from clk_sys so need to change clk_peri's freq
+    clock_configure(clk_peri,
+                    0,
+                    CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
+                    hertz,
+                    hertz);
+
+    // Re init uart now that clk_peri has changed
+    stdio_init_all();
+}
+
+#pragma endregion
 #pragma region Miscellaneous Functions
 
 int power_get_status(bool * is_battery_powered) 
@@ -334,8 +425,6 @@ void pico_w_deinit()
         cyw43_arch_deinit();
     #endif
 }
-
-#pragma endregion
 
 #pragma endregion
 #pragma region Utility Functions
@@ -1235,7 +1324,7 @@ void nine_with_library()
 
 #pragma region Example 10 (Hello Anything)
 
-int ten_without_library() 
+void ten_without_library() 
 {
     // create feature groups to group configuration settings
     // these will also show up in picotool info, not just picotool config
@@ -1255,6 +1344,7 @@ int ten_without_library()
 
     // stdio_usb initialisation
     bi_decl(bi_ptr_int32(0x1111, 1, use_usb, 1));
+
     if (use_usb) 
     {
         stdio_usb_init();
@@ -1270,7 +1360,7 @@ int ten_without_library()
     }
 }
 
-int ten_with_library() 
+void ten_with_library() 
 {
     // create feature groups to group configuration settings
     // these will also show up in picotool info, not just picotool config
@@ -1290,6 +1380,7 @@ int ten_with_library()
 
     // stdio_usb initialisation
     binary_define_variable_int32(0x1111, 1, use_usb, 1);
+    
     if (use_usb) 
     {
         stdio_usb_init();
@@ -1303,6 +1394,130 @@ int ten_with_library()
         printf("%s\n", text);
         sleep(1000);
     }
+}
+
+#pragma endregion
+#pragma region Example 11 (Hello 48 MHz)
+
+void eleven_without_library() 
+{
+    stdio_init_all();
+
+    printf("Hello, world!\n");
+
+    uint f_pll_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_SYS_CLKSRC_PRIMARY);
+    uint f_pll_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_USB_CLKSRC_PRIMARY);
+    uint f_rosc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_ROSC_CLKSRC);
+    uint f_clk_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
+    uint f_clk_peri = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI);
+    uint f_clk_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_USB);
+    uint f_clk_adc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_ADC);
+
+    #ifdef CLOCKS_FC0_SRC_VALUE_CLK_RTC
+        uint f_clk_rtc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_RTC);
+    #endif
+
+    printf("pll_sys  = %dkHz\n", f_pll_sys);
+    printf("pll_usb  = %dkHz\n", f_pll_usb);
+    printf("rosc     = %dkHz\n", f_rosc);
+    printf("clk_sys  = %dkHz\n", f_clk_sys);
+    printf("clk_peri = %dkHz\n", f_clk_peri);
+    printf("clk_usb  = %dkHz\n", f_clk_usb);
+    printf("clk_adc  = %dkHz\n", f_clk_adc);
+
+    #ifdef CLOCKS_FC0_SRC_VALUE_CLK_RTC
+        printf("clk_rtc  = %dkHz\n", f_clk_rtc);
+    #endif
+
+    // Can't measure clk_ref / xosc as it is the ref
+
+    // Change clk_sys to be 48MHz. The simplest way is to take this from PLL_USB
+    // which has a source frequency of 48MHz
+    clock_configure(clk_sys,
+                    CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+                    CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_USB,
+                    48 * MHZ,
+                    48 * MHZ);
+
+    // Turn off PLL sys for good measure
+    pll_deinit(pll_sys);
+
+    // CLK peri is clocked from clk_sys so need to change clk_peri's freq
+    clock_configure(clk_peri,
+                    0,
+                    CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
+                    48 * MHZ,
+                    48 * MHZ);
+
+    // Re init uart now that clk_peri has changed
+    stdio_init_all();
+
+    uint f_pll_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_SYS_CLKSRC_PRIMARY);
+    uint f_pll_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_USB_CLKSRC_PRIMARY);
+    uint f_rosc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_ROSC_CLKSRC);
+    uint f_clk_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
+    uint f_clk_peri = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI);
+    uint f_clk_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_USB);
+    uint f_clk_adc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_ADC);
+
+    #ifdef CLOCKS_FC0_SRC_VALUE_CLK_RTC
+        uint f_clk_rtc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_RTC);
+    #endif
+
+    printf("pll_sys  = %dkHz\n", f_pll_sys);
+    printf("pll_usb  = %dkHz\n", f_pll_usb);
+    printf("rosc     = %dkHz\n", f_rosc);
+    printf("clk_sys  = %dkHz\n", f_clk_sys);
+    printf("clk_peri = %dkHz\n", f_clk_peri);
+    printf("clk_usb  = %dkHz\n", f_clk_usb);
+    printf("clk_adc  = %dkHz\n", f_clk_adc);
+
+    #ifdef CLOCKS_FC0_SRC_VALUE_CLK_RTC
+        printf("clk_rtc  = %dkHz\n", f_clk_rtc);
+    #endif
+
+    // Can't measure clk_ref / xosc as it is the ref
+
+    printf("Hello, 48MHz");
+}
+
+void eleven_with_library() 
+{
+    stdio_init_all();
+
+    printf("Hello, world!\n");
+
+    uint64_t * hz = cpu_clock_get_all();
+
+    printf("pll_sys  = %d Hz\n", hz[0]);
+    printf("pll_usb  = %d Hz\n", hz[1]);
+    printf("rosc     = %d Hz\n", hz[2]);
+    printf("clk_sys  = %d Hz\n", hz[3]);
+    printf("clk_peri = %d Hz\n", hz[4]);
+    printf("clk_usb  = %d Hz\n", hz[5]);
+    printf("clk_adc  = %d Hz\n", hz[6]);
+
+    #ifdef CLOCKS_FC0_SRC_VALUE_CLK_RTC
+        printf("clk_rtc  = %dkHz\n", hz[7]);
+    #endif
+
+    cpu_clock_overclock(48 * MHZ);
+
+    hz = cpu_clock_get_all();
+
+    printf("pll_sys  = %d Hz\n", hz[0]);
+    printf("pll_usb  = %d Hz\n", hz[1]);
+    printf("rosc     = %d Hz\n", hz[2]);
+    printf("clk_sys  = %d Hz\n", hz[3]);
+    printf("clk_peri = %d Hz\n", hz[4]);
+    printf("clk_usb  = %d Hz\n", hz[5]);
+    printf("clk_adc  = %d Hz\n", hz[6]);
+
+    #ifdef CLOCKS_FC0_SRC_VALUE_CLK_RTC
+        printf("clk_rtc  = %dkHz\n", hz[7]);
+    #endif
+
+    printf("Hello, 48MHz");
 }
 
 #pragma endregion
