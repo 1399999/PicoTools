@@ -66,10 +66,11 @@ void gpio_pin_set_mode(uint8_t pin, bool is_input);
 void gpio_pin_set_high_low(uint8_t pin, bool is_high);
 
 // Binary functions
-#define binary_info_add_description(description) bi_decl(bi_program_description(description))
+#define binary_info_add_global_description(description) bi_decl(bi_program_description(description))
 #define binary_info_name_pin(pin, name) bi_decl(bi_1pin_with_name(pin, name))
-#define binary_info_name_program(hex_tag, id, name) bi_decl(bi_program_feature_group(hex_tag, id, name))
+#define binary_info_name_group(hex_tag, id, name) bi_decl(bi_program_feature_group(hex_tag, id, name))
 #define binary_define_variable_int32(hex_tag, id, variable_name, value) bi_decl(bi_ptr_int32(hex_tag, id, variable_name, value))
+#define binary_define_variable_string(hex_tag, id, variable_name, value, max_length) bi_decl(bi_ptr_string(hex_tag, id, variable_name, value, max_length))
 
 // Miscellaneous Functions
 int power_get_status(bool * battery_powered);
