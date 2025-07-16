@@ -1,9 +1,70 @@
 #include "PicoLibrary.h"
+#include "hardware/pwm.h"
+#include "hardware/clocks.h"
 
 // For testing purposes.
-int main()
+// This example drives a PWM output at a range of duty cycles, and uses
+// another PWM slice in input mode to measure the duty cycle. You'll need to
+// connect these two pins with a jumper wire:
+const uint OUTPUT_PIN = 2;
+const uint MEASURE_PIN = 5;
+
+float measure_duty_cycle(uint gpio) 
 {
-    six_with_library();
+    // Only the PWM B pins can be used as inputs.
+    assert(pwm_gpio_to_channel(gpio) == PWM_CHAN_B);
+    uint slice_num = pwm_gpio_to_slice_num(gpio);
+
+    // Count once for every 100 cycles the PWM B input is high
+    pwm_config cfg = pwm_get_default_config();
+    pwm_config_set_clkdiv_mode(&cfg, PWM_DIV_B_HIGH);
+    pwm_config_set_clkdiv(&cfg, 100);
+    pwm_init(slice_num, &cfg, false);
+    gpio_set_function(gpio, GPIO_FUNC_PWM);
+
+    pwm_set_enabled(slice_num, true);
+    sleep_ms(10);
+    pwm_set_enabled(slice_num, false);
+    float counting_rate = clock_get_hz(clk_sys) / 100;
+    float max_possible_count = counting_rate * 0.01;
+    return pwm_get_counter(slice_num) / max_possible_count;
+}
+
+const float test_duty_cycles[] = 
+{
+        0.f,
+        0.1f,
+        0.5f,
+        0.9f,
+        1.f
+};
+
+int main() 
+{
+    stdio_init_all();
+    printf("\nPWM duty cycle measurement example\n");
+
+    // Configure PWM slice and set it running
+    const uint count_top = 1000;
+    pwm_config cfg = pwm_get_default_config();
+    pwm_config_set_wrap(&cfg, count_top);
+    pwm_init(pwm_gpio_to_slice_num(OUTPUT_PIN), &cfg, true);
+
+    // Note we aren't touching the other pin yet -- PWM pins are outputs by
+    // default, but change to inputs once the divider mode is changed from
+    // free-running. It's not wise to connect two outputs directly together!
+    gpio_set_function(OUTPUT_PIN, GPIO_FUNC_PWM);
+
+    // For each of our test duty cycles, drive the output pin at that level,
+    // and read back the actual output duty cycle using the other pin. The two
+    // values should be very close!
+    for (uint i = 0; i < count_of(test_duty_cycles); ++i) {
+        float output_duty_cycle = test_duty_cycles[i];
+        pwm_set_gpio_level(OUTPUT_PIN, (uint16_t) (output_duty_cycle * (count_top + 1)));
+        float measured_duty_cycle = measure_duty_cycle(MEASURE_PIN);
+        printf("Output duty cycle = %.1f%%, measured input duty cycle = %.1f%%\n",
+               output_duty_cycle * 100.f, measured_duty_cycle * 100.f);
+    }
 }
 
 #pragma region Basic Functions
@@ -22,7 +83,7 @@ void led_set(bool led_on)
         // so we can use normal GPIO functionality to turn the led on and off.
         gpio_init(PICO_DEFAULT_LED_PIN);
         gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-        return PICO_OK;
+
         #elif defined(CYW43_WL_GPIO_LED_PIN)
             // For Pico W devices we need to initialise the driver, etc.
             return cyw43_arch_init();
@@ -223,7 +284,7 @@ void gpio_pin_set_input_output(uint8_t pin, bool is_input)
     gpio_set_input_enabled(pin, is_input);
 }
 
-void gpio_pin_set_mode(uint8_t pin, bool is_input)
+void gpio_pin_set_mode(uint8_t pin, bool high_voltage)
 {
     if (!is_gpio_init)
     {
@@ -231,7 +292,15 @@ void gpio_pin_set_mode(uint8_t pin, bool is_input)
         is_gpio_init = true;
     }
 
-    gpio_set_input_enabled(pin, is_input);
+    if (high_voltage)
+    {
+        gpio_pull_up(pin);
+    }
+
+    else
+    {
+        gpio_pull_down(pin);
+    }
 }
 
 void gpio_pin_set_high_low(uint8_t pin, bool is_high)
@@ -993,7 +1062,7 @@ void seven_with_library()
     printf("Beep boop, listening...\n");
     
     // Binary info canot be made into functions.
-    binary_info_add_description("Analog microphone example for Raspberry Pi Pico"); // for picotool
+    binary_info_add_global_description("Analog microphone example for Raspberry Pi Pico"); // for picotool
     binary_info_name_pin(ADC_PIN, "ADC input pin");
 
     uint adc_raw;
@@ -1342,10 +1411,10 @@ void ten_without_library()
     bi_decl(bi_ptr_int32(0x1111, 0, uart_rx, 1));
     bi_decl(bi_ptr_int32(0x1111, 0, uart_baud, 115200));
 
-    if (use_uart) 
-    {
-        stdio_uart_init_full(UART_INSTANCE(uart_num), uart_baud, uart_tx, uart_rx);
-    }
+    // if (use_uart) 
+    // {
+    //     stdio_uart_init_full(UART_INSTANCE(uart_num), uart_baud, uart_tx, uart_rx);
+    // }
 
     // stdio_usb initialisation
     bi_decl(bi_ptr_int32(0x1111, 1, use_usb, 1));
@@ -1378,10 +1447,10 @@ void ten_with_library()
     binary_define_variable_int32(0x1111, 0, uart_rx, 1);
     binary_define_variable_int32(0x1111, 0, uart_baud, 115200);
 
-    if (use_uart) 
-    {
-        stdio_uart_init_full(UART_INSTANCE(uart_num), uart_baud, uart_tx, uart_rx);
-    }
+    // if (use_uart) 
+    // {
+    //     stdio_uart_init_full(UART_INSTANCE(uart_num), uart_baud, uart_tx, uart_rx);
+    // }
 
     // stdio_usb initialisation
     binary_define_variable_int32(0x1111, 1, use_usb, 1);
@@ -1457,16 +1526,16 @@ void eleven_without_library()
     // Re init uart now that clk_peri has changed
     stdio_init_all();
 
-    uint f_pll_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_SYS_CLKSRC_PRIMARY);
-    uint f_pll_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_USB_CLKSRC_PRIMARY);
-    uint f_rosc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_ROSC_CLKSRC);
-    uint f_clk_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
-    uint f_clk_peri = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI);
-    uint f_clk_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_USB);
-    uint f_clk_adc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_ADC);
+    f_pll_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_SYS_CLKSRC_PRIMARY);
+    f_pll_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_USB_CLKSRC_PRIMARY);
+    f_rosc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_ROSC_CLKSRC);
+    f_clk_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
+    f_clk_peri = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI);
+    f_clk_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_USB);
+    f_clk_adc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_ADC);
 
     #ifdef CLOCKS_FC0_SRC_VALUE_CLK_RTC
-        uint f_clk_rtc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_RTC);
+        f_clk_rtc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_RTC);
     #endif
 
     printf("pll_sys  = %dkHz\n", f_pll_sys);
@@ -1506,7 +1575,7 @@ void eleven_with_library()
         printf("clk_rtc  = %dkHz\n", hz[7]);
     #endif
 
-    cpu_clock_overclock(48 * MHZ);
+    cpu_clock_set(48 * MHZ);
 
     hz = cpu_clock_get_all();
 
@@ -1526,7 +1595,7 @@ void eleven_with_library()
 }
 
 #pragma endregion
-#pragma region Example 12 (Hello 48 MHz)
+#pragma region Example 12 (Hello GP Out)
 
 void twelve_without_library()
 {
